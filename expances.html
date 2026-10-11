@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Мои финансы</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: Arial, sans-serif;
+            color: #222;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+        }
+
+        .balance {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .summary-item {
+            width: 50%;
+        }
+
+        .income {
+            color: #16a34a;
+        }
+
+        .expense {
+            color: #dc2626;
+        }
+
+        .type-switch {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .type-button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: #f1f1f1;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .type-button.active.expense-btn {
+            background: #fee2e2;
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        .type-button.active.income-btn {
+            background: #dcfce7;
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 18px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .submit-button {
+            width: 100%;
+            padding: 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .transaction {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transaction:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-title {
+            font-weight: bold;
+        }
+
+        .transaction-date {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .transaction-amount {
+            font-weight: bold;
+        }
+
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Мои финансы</h1>
+
+    <!-- Баланс -->
+
+    <div class="card">
+
+        <div>Общий баланс</div>
+
+        <div class="balance" id="balance">
+            0.00 BYN
+        </div>
+
+        <div class="summary">
+
+            <div class="summary-item">
+                <div>Доходы</div>
+                <h3 class="income" id="totalIncome">
+                    0.00 BYN
+                </h3>
+            </div>
+
+            <div class="summary-item">
+                <div>Расходы</div>
+                <h3 class="expense" id="totalExpense">
+                    0.00 BYN
+                </h3>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Добавление операции -->
+
+    <div class="card">
+
+        <h2>Новая операция</h2>
+
+        <div class="type-switch">
+
+            <button
+                class="type-button active expense-btn"
+                id="expenseButton"
+                onclick="setType('expense')">
+                Расход
+            </button>
+
+            <button
+                class="type-button income-btn"
+                id="incomeButton"
+                onclick="setType('income')">
+                Доход
+            </button>
+
+        </div>
+
+        <label>Сумма</label>
+
+        <input
+            type="number"
+            id="amount"
+            placeholder="Введите сумму"
+            min="0.01"
+            step="0.01">
+
+        <label>Категория</label>
+
+        <select id="category"></select>
+
+        <label>Комментарий</label>
+
+        <input
+            type="text"
+            id="comment"
+            placeholder="Например, покупка продуктов">
+
+        <label>Дата</label>
+
+        <input
+            type="date"
+            id="date">
+
+        <button
+            class="submit-button"
+            onclick="addTransaction()">
+            Добавить операцию
+        </button>
+
+    </div>
+
+    <!-- История -->
+
+    <div class="card">
+
+        <h2>История операций</h2>
+
+        <div id="transactionsList"></div>
+
+    </div>
+
+</div>
+
+<script>
+
+    // Категории операций
+
+    const categories = {
+
+        expense: [
+            "Еда",
+            "Подарки",
+            "ЖКХ",
+            "Одежда",
+            "Здоровье",
+            "Для дома",
+            "Развлечения",
+            "Транспорт",
+            "Займ",
+            "Уходовые средства",
+            "Подписки",
+            "Алкоголь",
+            "Квартплата",
+            "Техника",
+            "Dates",
+            "Поступления мне"
+        ],
+
+        income: [
+            "Зарплата",
+            "Подработка",
+            "Подарки",
+            "Инвестиции",
+            "Возвраты",
+            "Другие доходы"
+        ]
+
+    };
+
+
+    // Текущий тип операции
+
+    let currentType = "expense";
+
+
+    // Загружаем сохранённые операции
+
+    let transactions = [];
+
+    try {
+        const saved = JSON.parse(
+            localStorage.getItem("transactions") || "[]"
+        );
+
+        transactions = Array.isArray(saved) ? saved : [];
+    } catch (error) {
+        transactions = [];
+    }
+
+
+    // Устанавливаем сегодняшнюю дату
+
+    const today = new Date();
+
+    const localDate = new Date(
+        today.getTime() - today.getTimezoneOffset() * 60000
+    ).toISOString().split("T")[0];
+
+    document.getElementById("date").value = localDate;
+
+
+    // Переключение доход / расход
+
+    function setType(type) {
+
+        currentType = type;
+
+        document.getElementById("expenseButton")
+            .classList.toggle("active", type === "expense");
+
+        document.getElementById("incomeButton")
+            .classList.toggle("active", type === "income");
+
+        updateCategories();
+
+    }
+
+
+    // Обновление списка категорий
+
+    function updateCategories() {
+
+        const select = document.getElementById("category");
+
+        select.innerHTML = "";
+
+        categories[currentType].forEach(category => {
+
+            const option = document.createElement("option");
+
+            option.value = category;
+            option.textContent = category;
+
+            select.appendChild(option);
+
+        });
+
+    }
+
+
+    // Добавление операции
+
+    function addTransaction() {
+
+        const amount = Number(
+            document.getElementById("amount").value
+        );
+
+        const category = document.getElementById("category").value;
+
+        const comment = document.getElementById("comment").value;
+
+        const date = document.getElementById("date").value;
+
+
+        // Проверяем сумму
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+
+            alert("Введите корректную сумму");
+
+            return;
+
+        }
+
+        if (!date) {
+            alert("Выберите дату");
+            return;
+        }
+
+
+        // Создаём операцию
+
+        const transaction = {
+
+            id: crypto.randomUUID(),
+
+            type: currentType,
+
+            amount: amount,
+
+            category: category,
+
+            comment: comment,
+
+            date: date
+
+        };
+
+
+        // Добавляем в массив
+
+        transactions.unshift(transaction);
+
+
+        // Сохраняем в браузере
+
+        localStorage.setItem(
+            "transactions",
+            JSON.stringify(transactions)
+        );
+
+
+        // Очищаем поля
+
+        document.getElementById("amount").value = "";
+
+        document.getElementById("comment").value = "";
+
+
+        // Обновляем интерфейс
+
+        renderTransactions();
+
+        updateBalance();
+
+    }
+
+
+    // Отображение операций
+
+    function renderTransactions() {
+
+        const list = document.getElementById("transactionsList");
+
+        list.innerHTML = "";
+
+
+        if (transactions.length === 0) {
+
+            list.innerHTML = `
+                <div class="empty">
+                    Пока нет операций
+                </div>
+            `;
+
+            return;
+
+        }
+
+
+        transactions.forEach(transaction => {
+
+            const item = document.createElement("div");
+
+            item.className = "transaction";
+
+
+            const info = document.createElement("div");
+
+            const title = document.createElement("div");
+
+            title.className = "transaction-title";
+
+            title.textContent = transaction.category;
+
+
+            const date = document.createElement("div");
+
+            date.className = "transaction-date";
+
+            date.textContent =
+                transaction.date +
+                (transaction.comment ? " · " + transaction.comment : "");
+
+
+            info.appendChild(title);
+
+            info.appendChild(date);
+
+
+            const amount = document.createElement("div");
+
+            amount.className = "transaction-amount";
+
+            amount.classList.add(
+                transaction.type === "income" ? "income" : "expense"
+            );
+
+            amount.textContent =
+                (transaction.type === "income" ? "+" : "-") +
+                Number(transaction.amount).toFixed(2) +
+                " BYN";
+
+
+            item.appendChild(info);
+
+            item.appendChild(amount);
+
+            list.appendChild(item);
+
+        });
+
+    }
+
+
+    // Расчёт баланса
+
+    function updateBalance() {
+
+        let income = 0;
+
+        let expense = 0;
+
+
+        transactions.forEach(transaction => {
+
+            if (transaction.type === "income") {
+
+                income += Number(transaction.amount);
+
+            } else {
+
+                expense += Number(transaction.amount);
+
+            }
+
+        });
+
+
+        const balance = income - expense;
+
+
+        document.getElementById("balance").textContent =
+            balance.toFixed(2) + " BYN";
+
+        document.getElementById("totalIncome").textContent =
+            income.toFixed(2) + " BYN";
+
+        document.getElementById("totalExpense").textContent =
+            expense.toFixed(2) + " BYN";
+
+    }
+
+
+    // Запуск приложения
+
+    updateCategories();
+
+    renderTransactions();
+
+    updateBalance();
+
+</script>
+</script>
+ <script>
+  const tg = window.Telegram.WebApp;
+
+  // Сообщаем Telegram, что приложение готово
+  tg.ready();
+
+  // Разворачиваем приложение
+  tg.expand();
+
+  // Получаем данные пользователя
+  const user = tg.initDataUnsafe?.user;
+
+  if (user) {
+    console.log("Пользователь:", user.first_name);
+  }
+</script>
+</body>
+</html>
