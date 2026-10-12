@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Мои финансы</title>
+
+    <!-- Telegram Mini Apps SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: var(--tg-theme-secondary-bg-color, #f5f6fa);
+            font-family: Montserrat, Arial, sans-serif;
+            color: var(--tg-theme-text-color, #222);
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin: 0 0 20px;
+        }
+
+        h2 {
+            font-size: 19px;
+            margin: 0 0 20px;
+        }
+
+        .card {
+            background: var(--tg-theme-bg-color, white);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+        }
+
+        /* =====================================
+           ОБЩИЕ РАСХОДЫ
+        ===================================== */
+
+        .balance-label {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #888);
+        }
+
+        .balance {
+            font-size: 34px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        /* =====================================
+           ПОЛЯ ФОРМЫ
+        ===================================== */
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 20px;
+            border: 1px solid var(--tg-theme-section-separator-color, #ddd);
+            border-radius: 10px;
+            font-size: 16px;
+            background: var(--tg-theme-bg-color, white);
+            color: var(--tg-theme-text-color, #222);
+            outline: none;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: #2563eb;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #888);
+            margin: -12px 0 20px;
+            line-height: 1.5;
+        }
+
+        /* =====================================
+           КНОПКА ДОБАВЛЕНИЯ
+        ===================================== */
+
+        .submit-button {
+            width: 100%;
+            padding: 16px;
+            background: var(--tg-theme-button-color, #2563eb);
+            color: var(--tg-theme-button-text-color, white);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .submit-button:active {
+            transform: scale(0.98);
+        }
+
+        /* =====================================
+           ИСТОРИЯ ОПЕРАЦИЙ
+        ===================================== */
+
+        .transaction {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--tg-theme-section-separator-color, #eee);
+        }
+
+        .transaction:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .transaction-title {
+            font-size: 15px;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .transaction-subtitle {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-top: 5px;
+            overflow-wrap: anywhere;
+        }
+
+        .transaction-date {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-top: 6px;
+        }
+
+        .transaction-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .transaction-amount {
+            font-size: 15px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* Положительный расход */
+        .expense {
+            color: #dc2626;
+        }
+
+        /* Возврат или корректировка */
+        .refund {
+            color: #16a34a;
+        }
+
+        .delete-button {
+            border: none;
+            background: transparent;
+            color: #999;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .delete-button:hover {
+            color: #dc2626;
+        }
+
+        .empty {
+            text-align: center;
+            color: var(--tg-theme-hint-color, #999);
+            padding: 25px 10px;
+            font-size: 14px;
+        }
+
+        /* =====================================
+           МОБИЛЬНАЯ АДАПТАЦИЯ
+        ===================================== */
+
+        @media (max-width: 380px) {
+
+            body {
+                padding: 12px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .transaction-amount {
+                font-size: 13px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Мои финансы</h1>
+
+
+    <!-- =====================================
+         ОБЩИЕ РАСХОДЫ
+    ===================================== -->
+
+    <div class="card">
+
+        <div class="balance-label">
+            Общие расходы
+        </div>
+
+        <div class="balance" id="balance">
+            0.00 BYN
+        </div>
+
+    </div>
+
+
+    <!-- =====================================
+         ДОБАВЛЕНИЕ ОПЕРАЦИИ
+    ===================================== -->
+
+    <div class="card">
+
+        <h2>Новый расход</h2>
+
+
+        <!-- Сумма -->
+
+        <label for="amount">
+            Сумма, BYN
+        </label>
+
+        <input
+            type="number"
+            id="amount"
+            placeholder="Например, 25.50"
+            step="0.01"
+            inputmode="decimal"
+        >
+
+        <div class="hint">
+            Для обычного расхода укажи положительную сумму.
+            Для возврата денег или корректировки используй знак минус.
+        </div>
+
+
+        <!-- Категория -->
+
+        <label for="category">
+            Категория
+        </label>
+
+        <select
+            id="category"
+            onchange="updateSubcategories()">
+        </select>
+
+
+        <!-- Подкатегория -->
+
+        <label for="subcategory">
+            Подкатегория
+        </label>
+
+        <select id="subcategory">
+        </select>
+
+
+        <!-- Комментарий -->
+
+        <label for="comment">
+            Комментарий
+        </label>
+
+        <input
+            type="text"
+            id="comment"
+            placeholder="Необязательно"
+            maxlength="200"
+        >
+
+
+        <!-- Дата -->
+
+        <label for="date">
+            Дата операции
+        </label>
+
+        <input
+            type="date"
+            id="date"
+        >
+
+
+        <!-- Кнопка -->
+
+        <button
+            type="button"
+            class="submit-button"
+            onclick="addTransaction()">
+
+            Добавить операцию
+
+        </button>
+
+    </div>
+
+
+    <!-- =====================================
+         ИСТОРИЯ ОПЕРАЦИЙ
+    ===================================== -->
+
+    <div class="card">
+
+        <h2>История операций</h2>
+
+        <div id="transactionsList"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    // ========================================
+    // 1. TELEGRAM MINI APP
+    // ========================================
+
+    const tg = window.Telegram?.WebApp;
+
+    if (tg) {
+        tg.ready();
+        tg.expand();
+    }
+
+
+    // ========================================
+    // 2. КАТЕГОРИИ И ПОДКАТЕГОРИИ
+    // ========================================
+
+    const categories = {
+
+        "Еда": [
+            "Доставки",
+            "Обеды",
+            "Домашняя еда"
+        ],
+
+        "Подарки": [
+            "Подарки на работе"
+        ],
+
+        "ЖКХ": [
+            "Интернет, телефон",
+            "Газ",
+            "Коммунальные платежи"
+        ],
+
+        "Одежда": [],
+
+        "Здоровье": [
+            "Врачи",
+            "Лекарства",
+            "Линзы"
+        ],
+
+        "Для дома": [],
+
+        "Развлечения": [
+            "Кафе",
+            "Бары",
+            "Рестораны",
+            "Посиделки",
+            "Кино",
+            "Игры"
+        ],
+
+        "Транспорт": [
+            "Общественный транспорт",
+            "Такси",
+            "Маршрутка"
+        ],
+
+        "Займ": [],
+
+        "Уходовые средства": [],
+
+        "Подписки": [
+            "VPN",
+            "Нейросети"
+        ],
+
+        "Алкоголь": [],
+
+        "Квартплата": [],
+
+        "Dates": [],
+
+        "Поступления мне": []
+
+    };
+
+
+    // ========================================
+    // 3. ЗАГРУЗКА ОПЕРАЦИЙ
+    // ========================================
+
+    let transactions = [];
+
+    try {
+
+        const saved = JSON.parse(
+            localStorage.getItem("transactions") || "[]"
+        );
+
+        transactions = Array.isArray(saved) ? saved : [];
+
+    } catch (error) {
+
+        console.error("Ошибка загрузки операций:", error);
+
+        transactions = [];
+
+    }
+
+
+    // ========================================
+    // 4. УСТАНОВКА ТЕКУЩЕЙ ДАТЫ
+    // ========================================
+
+    const today = new Date();
+
+    const localDate = new Date(
+        today.getTime() - today.getTimezoneOffset() * 60000
+    ).toISOString().split("T")[0];
+
+    document.getElementById("date").value = localDate;
+
+
+    // ========================================
+    // 5. ОБНОВЛЕНИЕ КАТЕГОРИЙ
+    // ========================================
+
+    function updateCategories() {
+
+        const select = document.getElementById("category");
+
+        select.innerHTML = "";
+
+        Object.keys(categories).forEach(category => {
+
+            const option = document.createElement("option");
+
+            option.value = category;
+
+            option.textContent = category;
+
+            select.appendChild(option);
+
+        });
+
+        updateSubcategories();
+
+    }
+
+
+    // ========================================
+    // 6. ОБНОВЛЕНИЕ ПОДКАТЕГОРИЙ
+    // ========================================
+
+    function updateSubcategories() {
+
+        const category =
+            document.getElementById("category").value;
+
+        const select =
+            document.getElementById("subcategory");
+
+        select.innerHTML = "";
+
+
+        // Без подкатегории
+
+        const emptyOption = document.createElement("option");
+
+        emptyOption.value = "";
+
+        emptyOption.textContent = "Без подкатегории";
+
+        select.appendChild(emptyOption);
+
+
+        // Подкатегории выбранной категории
+
+        const subcategories = categories[category] || [];
+
+        subcategories.forEach(subcategory => {
+
+            const option = document.createElement("option");
+
+            option.value = subcategory;
+
+            option.textContent = subcategory;
+
+            select.appendChild(option);
+
+        });
+
+    }
+
+
+    // ========================================
+    // 7. ДОБАВЛЕНИЕ ОПЕРАЦИИ
+    // ========================================
+
+    function addTransaction() {
+
+        const amountInput =
+            document.getElementById("amount");
+
+        const amount = Number(amountInput.value);
+
+        const category =
+            document.getElementById("category").value;
+
+        const subcategory =
+            document.getElementById("subcategory").value;
+
+        const comment =
+            document.getElementById("comment").value.trim();
+
+        const date =
+            document.getElementById("date").value;
+
+
+        // Проверка суммы
+
+        if (
+            amountInput.value.trim() === "" ||
+            !Number.isFinite(amount) ||
+            amount === 0 ||
+            Math.round(amount * 100) !== amount * 100
+        ) {
+
+            alert("Введите корректную сумму, отличную от нуля, с точностью до 2 знаков");
+
+            return;
+
+        }
+
+
+        // Проверка обязательных полей
+
+        if (!category || !date) {
+
+            alert("Заполните обязательные поля");
+
+            return;
+
+        }
+
+
+        // Создаём операцию
+
+        const transaction = {
+
+            id: crypto.randomUUID(),
+
+            amount: amount,
+
+            category: category,
+
+            subcategory: subcategory,
+
+            comment: comment,
+
+            date: date
+
+        };
+
+
+        // Сохраняем операцию
+
+        transactions.unshift(transaction);
+
+        try {
+
+            localStorage.setItem(
+                "transactions",
+                JSON.stringify(transactions)
+            );
+
+        } catch (error) {
+
+            transactions.shift();
+
+            alert("Не удалось сохранить операцию");
+
+            return;
+
+        }
+
+
+        // Очищаем поля
+
+        amountInput.value = "";
+
+        document.getElementById("comment").value = "";
+
+
+        // Обновляем интерфейс
+
+        renderTransactions();
+
+        updateBalance();
+
+
+        // Вибрация в Telegram
+
+        if (tg?.HapticFeedback) {
+
+            tg.HapticFeedback.notificationOccurred("success");
+
+        }
+
+    }
+
+
+    // ========================================
+    // 8. ИСТОРИЯ ОПЕРАЦИЙ
+    // ========================================
+
+    function renderTransactions() {
+
+        const list =
+            document.getElementById("transactionsList");
+
+        list.innerHTML = "";
+
+
+        if (transactions.length === 0) {
+
+            const empty = document.createElement("div");
+
+            empty.className = "empty";
+
+            empty.textContent = "Пока нет операций";
+
+            list.appendChild(empty);
+
+            return;
+
+        }
+
+
+        transactions.forEach(transaction => {
+
+            const item = document.createElement("div");
+
+            item.className = "transaction";
+
+
+            // Левая часть
+
+            const info = document.createElement("div");
+
+            info.className = "transaction-info";
+
+
+            // Категория
+
+            const title = document.createElement("div");
+
+            title.className = "transaction-title";
+
+            title.textContent = transaction.category;
+
+
+            // Подкатегория
+
+            const subtitle = document.createElement("div");
+
+            subtitle.className = "transaction-subtitle";
+
+            subtitle.textContent =
+                transaction.subcategory || "Без подкатегории";
+
+
+            // Дата и комментарий
+
+            const date = document.createElement("div");
+
+            date.className = "transaction-date";
+
+            date.textContent =
+                transaction.date +
+                (transaction.comment
+                    ? " · " + transaction.comment
+                    : "");
+
+
+            info.appendChild(title);
+
+            info.appendChild(subtitle);
+
+            info.appendChild(date);
+
+
+            // Правая часть
+
+            const right = document.createElement("div");
+
+            right.className = "transaction-right";
+
+
+            // Сумма
+
+            const amount = document.createElement("div");
+
+            amount.className = "transaction-amount";
+
+            const transactionAmount = Number(transaction.amount);
+
+            amount.classList.add(
+                transactionAmount < 0 ? "refund" : "expense"
+            );
+
+            amount.textContent =
+                transactionAmount.toFixed(2) + " BYN";
+
+
+            // Кнопка удаления
+
+            const deleteButton = document.createElement("button");
+
+            deleteButton.className = "delete-button";
+
+            deleteButton.textContent = "×";
+
+            deleteButton.setAttribute(
+                "aria-label",
+                "Удалить операцию"
+            );
+
+            deleteButton.onclick = () => {
+
+                deleteTransaction(transaction.id);
+
+            };
+
+
+            right.appendChild(amount);
+
+            right.appendChild(deleteButton);
+
+
+            item.appendChild(info);
+
+            item.appendChild(right);
+
+            list.appendChild(item);
+
+        });
+
+    }
+
+
+    // ========================================
+    // 9. УДАЛЕНИЕ ОПЕРАЦИИ
+    // ========================================
+
+    function deleteTransaction(id) {
+
+        const confirmed = confirm(
+            "Удалить эту операцию?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const updatedTransactions = transactions.filter(
+            transaction => transaction.id !== id
+        );
+
+        try {
+
+            localStorage.setItem(
+                "transactions",
+                JSON.stringify(updatedTransactions)
+            );
+
+        } catch (error) {
+
+            alert("Не удалось удалить операцию");
+
+            return;
+
+        }
+
+        transactions = updatedTransactions;
+
+        renderTransactions();
+
+        updateBalance();
+
+    }
+
+
+    // ========================================
+    // 10. РАСЧЁТ ОБЩИХ РАСХОДОВ
+    // ========================================
+
+    function updateBalance() {
+
+        // Суммируем все операции с учётом знака
+
+        const total = transactions.reduce((sum, transaction) => {
+
+            const amount = Number(transaction.amount);
+
+            if (!Number.isFinite(amount)) {
+                return sum;
+            }
+
+            return sum + amount;
+
+        }, 0);
+
+
+        document.getElementById("balance").textContent =
+            total.toFixed(2) + " BYN";
+
+    }
+
+
+    // ========================================
+    // 11. ЗАПУСК ПРИЛОЖЕНИЯ
+    // ========================================
+
+    updateCategories();
+
+    renderTransactions();
+
+    updateBalance();
+
+</script>
+
+</body>
+</html>
